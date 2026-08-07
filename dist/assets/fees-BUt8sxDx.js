@@ -1,0 +1,1 @@
+import{h as t,s}from"./index-DSXzeSih.js";import{e as r}from"./demoData-Dno5nKJC.js";async function i(){if(!t)return r;const{data:a,error:e}=await s.from("fee_invoices").select("*, students(full_name), fee_payments(id, amount, receipt_number, payment_date)").order("created_at",{ascending:!1});if(e)throw e;return a}export{i as g};

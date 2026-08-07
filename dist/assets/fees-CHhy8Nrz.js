@@ -1,0 +1,1 @@
+import{h as e,s}from"./index-lgd4DuNE.js";async function r(){if(!e)return[{id:"1",student_name:"Aarav Sharma",amount:15e3,status:"paid",due_date:"2026-08-15"},{id:"2",student_name:"Ananya Verma",amount:15e3,status:"pending",due_date:"2026-08-20"}];const{data:t,error:a}=await s.from("invoices").select("*");if(a)throw a;return t||[]}export{r as g};
