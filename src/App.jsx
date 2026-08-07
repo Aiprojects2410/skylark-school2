@@ -1,5 +1,5 @@
 import { Suspense, lazy } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route } from 'react-router-dom'
 import LoadingSpinner from './components/LoadingSpinner'
 import ProtectedRoute from './routes/ProtectedRoute'
 import RoleProtectedRoute from './routes/RoleProtectedRoute'
@@ -12,7 +12,6 @@ import Forbidden403 from './pages/errors/Forbidden403'
 import NotFound404 from './pages/errors/NotFound404'
 import ServerError500 from './pages/errors/ServerError500'
 
-// Lazy-load every dashboard page so the initial bundle stays small.
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Students = lazy(() => import('./pages/Students'))
 const Teachers = lazy(() => import('./pages/Teachers'))
@@ -25,6 +24,7 @@ const Notices = lazy(() => import('./pages/Notices'))
 const Leave = lazy(() => import('./pages/Leave'))
 const Reports = lazy(() => import('./pages/Reports'))
 const SettingsPage = lazy(() => import('./pages/SettingsPage'))
+const SupportTickets = lazy(() => import('./pages/SupportTickets'))
 const TeacherDashboard = lazy(() => import('./pages/TeacherDashboard'))
 const TeacherAttendanceAdmin = lazy(() => import('./pages/TeacherAttendanceAdmin'))
 const StudentDashboard = lazy(() => import('./pages/StudentDashboard'))
@@ -47,17 +47,12 @@ export default function App() {
         <Route path="/500" element={<ServerError500 />} />
 
         <Route element={<ProtectedRoute />}>
-          {/* Standalone Scanner Module — deliberately outside the dashboard shell (no sidebar/navbar)
-              so it behaves like a dedicated kiosk screen, as required by the spec. Still protected
-              by auth + role. */}
           <Route element={<RoleProtectedRoute roles={TEACHING_STAFF} />}>
             <Route path="scanner" element={<Scanner />} />
           </Route>
 
           <Route element={<DashboardLayout />}>
             <Route index element={<RoleHome />} />
-
-            {/* Role-specific dashboard aliases — each role lands on a purpose-built home. */}
             <Route path="dashboard/super-admin" element={<Dashboard />} />
             <Route path="dashboard/admin" element={<Dashboard />} />
             <Route path="dashboard/teacher" element={<TeacherDashboard />} />
@@ -66,29 +61,17 @@ export default function App() {
             <Route element={<RoleProtectedRoute roles={STAFF} />}>
               <Route path="students" element={<Students />} />
               <Route path="classes" element={<Classes />} />
-            </Route>
-
-            <Route element={<RoleProtectedRoute roles={TEACHING_STAFF} />}>
-              <Route path="attendance" element={<Attendance />} />
-            </Route>
-
-            <Route element={<RoleProtectedRoute roles={STAFF} />}>
               <Route path="teachers" element={<Teachers />} />
               <Route path="identity-cards" element={<IdentityCards />} />
               <Route path="reports" element={<Reports />} />
               <Route path="settings" element={<SettingsPage />} />
+              <Route path="support-tickets" element={<SupportTickets />} />
             </Route>
 
-            {/* Teacher Attendance: admin/principal can scan cards + correct manually; teachers
-                get the same page but read-only (see canMark check inside TeacherAttendanceAdmin). */}
             <Route element={<RoleProtectedRoute roles={TEACHING_STAFF} />}>
+              <Route path="attendance" element={<Attendance />} />
               <Route path="teacher-attendance" element={<TeacherAttendanceAdmin />} />
             </Route>
-
-            {/* Self-marked teacher attendance was removed — it can't be trusted (a QR
-                screenshot + faked GPS still lets someone mark "present" from off-campus).
-                Teacher attendance is now scanned by staff at reception, via Teacher Attendance
-                above (admin-only) — same trust model as student attendance. */}
 
             <Route path="homework" element={<Homework />} />
             <Route path="timetable" element={<Timetable />} />
