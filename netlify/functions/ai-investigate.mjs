@@ -64,9 +64,9 @@ ${JSON.stringify(ticket, null, 2)}
 REPOSITORY SNIPPETS:
 ${code.map(f => `FILE: ${f.path}\n${f.content}`).join('\n\n---\n\n')}`
 
-    const response = await fetch(`${baseUrl.replace(/\/$/, '')}/chat/completions`, {
+    const response = await fetch(`${baseUrl.replace(/\/$/, '')}/v1/chat/completions`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
       body: JSON.stringify({ model: MODEL, temperature: 0.1, messages: [
         { role: 'system', content: 'You diagnose software tickets. Output JSON only.' },
         { role: 'user', content: prompt },
