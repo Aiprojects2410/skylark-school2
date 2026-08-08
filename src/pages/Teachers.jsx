@@ -32,7 +32,7 @@ export default function Teachers() {
     } catch (e) { notify(e.message) }
   }
 
-  const handleLogin = async (teacher) => {
+  const handleLogin = async (teacher, isReset = false) => {
     setBusyId(teacher.id)
     try {
       const result = await createTeacherLogin(teacher.id)
@@ -67,7 +67,25 @@ export default function Teachers() {
                   <td>{t.qualification || '—'}</td>
                   <td>{t.phone || '—'}</td>
                   <td>{t.email || '—'}</td>
-                  <td>{t.auth_user_id || t.profile_id ? <span className="text-xs font-semibold text-emerald-600">Created</span> : <button disabled={busyId === t.id} className="text-xs font-semibold text-brand hover:underline disabled:opacity-50" onClick={() => handleLogin(t)}>{busyId === t.id ? 'Creating…' : 'Create login'}</button>}</td>
+                  <td>
+                    {t.auth_user_id || t.profile_id ? (
+                      <button
+                        disabled={busyId === t.id}
+                        className="text-xs font-semibold text-brand hover:underline disabled:opacity-50"
+                        onClick={() => handleLogin(t, true)}
+                      >
+                        {busyId === t.id ? 'Resetting…' : 'Reset login'}
+                      </button>
+                    ) : (
+                      <button
+                        disabled={busyId === t.id}
+                        className="text-xs font-semibold text-brand hover:underline disabled:opacity-50"
+                        onClick={() => handleLogin(t)}
+                      >
+                        {busyId === t.id ? 'Creating…' : 'Create login'}
+                      </button>
+                    )}
+                  </td>
                   <td><button className="text-xs font-semibold text-brand hover:underline" onClick={() => { setEditingTeacher(t); setShowModal(true) }}>Edit</button></td>
                 </tr>
               ))}
@@ -78,7 +96,7 @@ export default function Teachers() {
       </div>
 
       {showModal && <Modal title={editingTeacher ? 'Edit Teacher' : 'Add New Teacher'} onClose={() => setShowModal(false)}><TeacherForm teacher={editingTeacher || {}} onSave={handleSave} onCancel={() => setShowModal(false)} /></Modal>}
-      {credentials && <CredentialsModal credentials={credentials} title="Teacher login created" onClose={() => setCredentials(null)} />}
+      {credentials && <CredentialsModal credentials={credentials} title="Teacher login credentials" onClose={() => setCredentials(null)} />}
     </>
   )
 }
