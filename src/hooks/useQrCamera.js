@@ -4,9 +4,10 @@ import jsQR from 'jsqr'
 /**
  * Continuously scans the live camera feed for QR codes.
  *
- * Important: detecting one QR must NOT end the scan loop. The camera stays open
- * and keeps looking for the next card, while a short per-token cooldown prevents
- * the same card from being submitted dozens of times while it remains in frame.
+ * A QR token is accepted at most once per calendar day in this scanner
+ * session. This prevents a card that remains in front of the camera from
+ * generating repeated attendance requests/log entries every few seconds.
+ * The database also enforces one attendance record per person per day.
  */
 export function useQrCamera(onDetect) {
   const videoRef = useRef(null)
@@ -18,12 +19,15 @@ export function useQrCamera(onDetect) {
   const [cameraOn, setCameraOn] = useState(false)
   const [error, setError] = useState('')
 
+  const todayKey = () => new Date().toISOString().slice(0, 10)
+
   const stop = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current)
     rafRef.current = null
     streamRef.current?.getTracks().forEach(t => t.stop())
     streamRef.current = null
-    lastSeenRef.current.clear()
+    // Keep today's seen-token map so stopping/restarting the camera cannot
+    // cause the same card to be submitted repeatedly on the same day.
     setCameraOn(false)
   }, [])
 
@@ -31,14 +35,11 @@ export function useQrCamera(onDetect) {
     const video = videoRef.current
     const canvas = canvasRef.current
 
-    // Keep the camera loop alive even while the video is warming up.
     if (!video || video.readyState !== video.HAVE_ENOUGH_DATA) {
       rafRef.current = requestAnimationFrame(tick)
       return
     }
 
-    // jsQR is relatively expensive. Around 8 scans/sec is plenty for a person
-    // moving ID cards through the camera and keeps mobile devices responsive.
     if (timestamp - lastFrameAtRef.current < 120) {
       rafRef.current = requestAnimationFrame(tick)
       return
@@ -54,38 +55,36 @@ export function useQrCamera(onDetect) {
 
     if (code?.data) {
       const token = code.data
-      const lastSeen = lastSeenRef.current.get(token) || 0
+      const key = `${todayKey()}:${token}`
 
-      // A card can stay in frame for several seconds. Only submit it again
-      // after the cooldown, while allowing different cards immediately.
-      if (timestamp - lastSeen >= 1500) {
-        lastSeenRef.current.set(token, timestamp)
+      // Once a QR has been accepted today, never submit it again while this
+      // scanner component is mounted, even if the camera is restarted.
+      if (!lastSeenRef.current.has(key)) {
+        lastSeenRef.current.set(key, timestamp)
         onDetect(token)
+      }
 
-        // Keep memory bounded during a long attendance session.
-        if (lastSeenRef.current.size > 200) {
-          for (const [key, seenAt] of lastSeenRef.current) {
-            if (timestamp - seenAt > 10000) lastSeenRef.current.delete(key)
-          }
+      // Keep memory bounded during a long session. Tokens from previous days
+      // are no longer relevant and can safely be discarded.
+      if (lastSeenRef.current.size > 500) {
+        const today = todayKey()
+        for (const key of lastSeenRef.current.keys()) {
+          if (!key.startsWith(`${today}:`)) lastSeenRef.current.delete(key)
         }
       }
     }
 
-    // Never stop after a successful scan. The next QR can be presented while
-    // this same camera session remains active.
     rafRef.current = requestAnimationFrame(tick)
   }, [onDetect])
 
   const start = useCallback(async () => {
     setError('')
     try {
-      // If start is tapped again, clean up the previous stream first.
       if (streamRef.current) stop()
 
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
       streamRef.current = stream
       lastFrameAtRef.current = 0
-      lastSeenRef.current.clear()
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream
