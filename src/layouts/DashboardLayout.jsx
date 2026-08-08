@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { BarChart3, Bell, BookMarked, BookOpen, CalendarCheck, CalendarClock, CircleDollarSign, ClipboardList, GraduationCap, IdCard, LayoutDashboard, LogOut, Menu, Moon, QrCode, UserCheck, Search, Settings, Sun, Users, X, Ticket, Code2 } from 'lucide-react'
+import { BarChart3, Bell, BookMarked, BookOpen, CalendarCheck, CalendarClock, CircleDollarSign, ClipboardList, GraduationCap, IdCard, LayoutDashboard, LogOut, Menu, Moon, QrCode, UserCheck, Search, Settings, Sun, Users, X, Ticket, Code2, ShieldCheck } from 'lucide-react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { hasSupabase } from '../lib/supabase'
@@ -25,28 +25,25 @@ const NAV = [
   ['Support Tickets', Ticket, '/support-tickets', ['super_admin', 'admin', 'principal']],
   ['Settings', Settings, '/settings', ['super_admin', 'admin', 'principal']],
 ]
-
 const STUDENT_NAV = [
   ['My Details', GraduationCap, '/dashboard/student#details'],
   ['My Attendance', CalendarCheck, '/dashboard/student#attendance'],
   ['My QR', QrCode, '/dashboard/student#qr'],
 ]
-
 function Avatar({ name }) { return <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand/10 font-bold text-brand">{(name || '?').split(' ').map(x => x[0]).slice(0, 2).join('')}</span> }
-
 export default function DashboardLayout() {
   const [open, setOpen] = useState(false)
   const [dark, setDark] = useState(() => localStorage.getItem('skylark-theme') === 'dark')
   const [notifOpen, setNotifOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [search, setSearch] = useState('')
   const { profile, role, signOut } = useAuth()
   const navigate = useNavigate()
   useEffect(() => { document.documentElement.classList.toggle('dark', dark); localStorage.setItem('skylark-theme', dark ? 'dark' : 'light') }, [dark])
-  const visibleNav = role === 'student'
-    ? STUDENT_NAV
-    : NAV.filter(([, , , roles]) => !roles || !role || roles.includes(role))
+  const visibleNav = role === 'student' ? STUDENT_NAV : NAV.filter(([, , , roles]) => !roles || !role || roles.includes(role))
   async function handleLogout() { await signOut(); navigate('/login', { replace: true }) }
   const displayName = profile?.full_name || (role === 'student' ? 'Student' : null)
+  function submitSearch(e) { e.preventDefault(); if(search.trim()) navigate(`/global-search?q=${encodeURIComponent(search.trim())}`) }
   return <div className="min-h-screen bg-[#f6f8fc] text-slate-700 dark:bg-slate-950 dark:text-slate-200">
     {open && <button aria-label="Close menu" onClick={() => setOpen(false)} className="fixed inset-0 z-40 bg-slate-950/40 lg:hidden" />}
     <aside className={`sidebar ${open ? 'sidebar-open' : ''}`}>
@@ -57,10 +54,10 @@ export default function DashboardLayout() {
     <div className="lg:ml-64">
       <header className="flex h-[76px] items-center gap-4 border-b border-slate-200/80 bg-white px-5 sm:px-8 dark:border-slate-800 dark:bg-slate-900">
         <button onClick={() => setOpen(true)} className="lg:hidden"><Menu /></button>
-        <div className="hidden max-w-md flex-1 md:block"><label className="flex items-center gap-2 rounded-xl bg-slate-100 px-3 py-2 text-sm text-slate-400 dark:bg-slate-800"><Search size={17} /><input className="w-full bg-transparent outline-none" placeholder="Search anything..." /></label></div>
-        <div className="ml-auto flex items-center gap-3"><span className={`hidden rounded-full px-3 py-1 text-xs font-semibold sm:inline ${hasSupabase ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{hasSupabase ? 'Connected' : 'Preview mode'}</span><button onClick={() => setDark(v => !v)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Toggle dark mode">{dark ? <Sun size={20} /> : <Moon size={20} />}</button>
+        <form onSubmit={submitSearch} className="hidden max-w-md flex-1 md:block"><label className="flex items-center gap-2 rounded-xl bg-slate-100 px-3 py-2 text-sm text-slate-400 dark:bg-slate-800"><Search size={17} /><input className="w-full bg-transparent outline-none" placeholder="Search anything..." value={search} onChange={e=>setSearch(e.target.value)} /></label></form>
+        <div className="ml-auto flex items-center gap-3"><span className={`hidden rounded-full px-3 py-1 text-xs font-semibold sm:inline ${hasSupabase ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{hasSupabase ? 'Connected' : 'Preview mode'}</span><button onClick={() => navigate('/security')} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Security"><ShieldCheck size={20} /></button><button onClick={() => setDark(v => !v)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Toggle dark mode">{dark ? <Sun size={20} /> : <Moon size={20} />}</button>
           {role !== 'student' && <div className="relative"><button onClick={() => setNotifOpen(v => !v)} className="relative rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Notifications"><Bell size={20} /><i className="absolute right-2 top-2 h-2 w-2 rounded-full bg-rose-500" /></button>{notifOpen && <div className="absolute right-0 z-30 mt-2 w-72 rounded-xl border border-slate-100 bg-white p-3 shadow-xl dark:border-slate-800 dark:bg-slate-900"><p className="px-2 pb-2 text-sm font-bold text-ink dark:text-white">Notifications</p><div className="space-y-1 text-sm"><p className="rounded-lg px-2 py-2">New notice: Term 1 examination timetable</p><p className="rounded-lg px-2 py-2">3 leave requests awaiting approval</p></div></div>}</div>}
-          <div className="relative"><button onClick={() => setMenuOpen(v => !v)} className="flex items-center gap-2"><Avatar name={displayName} /><div className="hidden text-left sm:block"><p className="text-sm font-bold text-ink dark:text-white">{displayName || 'Loading…'}</p><p className="text-xs capitalize text-slate-500 dark:text-slate-400">{role?.replace('_', ' ') || ''}</p></div></button>{menuOpen && <div className="absolute right-0 z-30 mt-2 w-60 rounded-xl border border-slate-100 bg-white p-2 shadow-xl dark:border-slate-800 dark:bg-slate-900">{role !== 'student' && <button onClick={() => { setMenuOpen(false); navigate('/settings') }} className="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-800">Settings</button>}{role === 'super_admin' && <button onClick={() => { setMenuOpen(false); navigate('/super-admin/developer') }} className="block w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-brand hover:bg-slate-50 dark:hover:bg-slate-800">Developer Portal</button>}<button onClick={handleLogout} className="block w-full rounded-lg px-3 py-2 text-left text-sm text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40">Sign out</button></div>}</div>
+          <div className="relative"><button onClick={() => setMenuOpen(v => !v)} className="flex items-center gap-2"><Avatar name={displayName} /><div className="hidden text-left sm:block"><p className="text-sm font-bold text-ink dark:text-white">{displayName || 'Loading…'}</p><p className="text-xs capitalize text-slate-500 dark:text-slate-400">{role?.replace('_', ' ') || ''}</p></div></button>{menuOpen && <div className="absolute right-0 z-30 mt-2 w-60 rounded-xl border border-slate-100 bg-white p-2 shadow-xl dark:border-slate-800 dark:bg-slate-900"><button onClick={() => { setMenuOpen(false); navigate('/security') }} className="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-800">Login Activity & Security</button>{role !== 'student' && <button onClick={() => { setMenuOpen(false); navigate('/settings') }} className="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-800">Settings</button>}{role === 'super_admin' && <button onClick={() => { setMenuOpen(false); navigate('/super-admin/developer') }} className="block w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-brand hover:bg-slate-50 dark:hover:bg-slate-800">Developer Portal</button>}<button onClick={handleLogout} className="block w-full rounded-lg px-3 py-2 text-left text-sm text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40">Sign out</button></div>}</div>
         </div>
       </header>
       <main className="p-5 sm:p-8"><Outlet /><BrandFooter /></main>
