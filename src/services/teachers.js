@@ -23,8 +23,9 @@ export async function saveTeacher(teacher) {
 
 export async function deleteTeacher(id) {
   if (!supabase) return
-  const { error } = await supabase.from('teachers').delete().eq('id', id)
+  const { data, error } = await supabase.functions.invoke('delete-teacher', { body: { teacher_id: id } })
   if (error) throw error
+  if (data?.error) throw new Error(data.error)
 }
 
 export async function createTeacherLogin(teacherId) {
