@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { BarChart3, Bell, BookMarked, BookOpen, CalendarCheck, CalendarClock, CircleDollarSign, ClipboardList, GraduationCap, IdCard, LayoutDashboard, LogOut, Menu, Moon, QrCode, UserCheck, Search, Settings, Sun, Users, X, Ticket, Code2 } from 'lucide-react'
+import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { hasSupabase } from '../lib/supabase'
 import BrandFooter from '../components/BrandFooter'
@@ -26,6 +26,12 @@ const NAV = [
   ['Settings', Settings, '/settings', ['super_admin', 'admin', 'principal']],
 ]
 
+const STUDENT_NAV = [
+  ['My Details', GraduationCap, '/dashboard/student#details'],
+  ['My Attendance', CalendarCheck, '/dashboard/student#attendance'],
+  ['My QR', QrCode, '/dashboard/student#qr'],
+]
+
 function Avatar({ name }) { return <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand/10 font-bold text-brand">{(name || '?').split(' ').map(x => x[0]).slice(0, 2).join('')}</span> }
 
 export default function DashboardLayout() {
@@ -37,7 +43,7 @@ export default function DashboardLayout() {
   const navigate = useNavigate()
   useEffect(() => { document.documentElement.classList.toggle('dark', dark); localStorage.setItem('skylark-theme', dark ? 'dark' : 'light') }, [dark])
   const visibleNav = role === 'student'
-    ? NAV.filter(([, , path]) => path === '/')
+    ? STUDENT_NAV
     : NAV.filter(([, , , roles]) => !roles || !role || roles.includes(role))
   async function handleLogout() { await signOut(); navigate('/login', { replace: true }) }
   const displayName = profile?.full_name || (role === 'student' ? 'Student' : null)
