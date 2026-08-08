@@ -13,6 +13,7 @@ import NotFound404 from './pages/errors/NotFound404'
 import ServerError500 from './pages/errors/ServerError500'
 
 const Dashboard = lazy(() => import('./pages/Dashboard'))
+const SuperAdminDeveloperPortal = lazy(() => import('./pages/SuperAdminDeveloperPortal'))
 const Students = lazy(() => import('./pages/Students'))
 const Teachers = lazy(() => import('./pages/Teachers'))
 const Classes = lazy(() => import('./pages/Classes'))
@@ -57,6 +58,10 @@ export default function App() {
             <Route path="dashboard/admin" element={<Dashboard />} />
             <Route path="dashboard/teacher" element={<TeacherDashboard />} />
             <Route path="dashboard/student" element={<StudentDashboard />} />
+
+            <Route element={<RoleProtectedRoute roles={['super_admin']} />}>
+              <Route path="super-admin/developer" element={<SuperAdminDeveloperPortal />} />
+            </Route>
 
             <Route element={<RoleProtectedRoute roles={STAFF} />}>
               <Route path="students" element={<Students />} />
