@@ -31,9 +31,12 @@ const TeacherAttendanceAdmin = lazy(() => import('./pages/TeacherAttendanceAdmin
 const StudentDashboard = lazy(() => import('./pages/StudentDashboard'))
 const Homework = lazy(() => import('./pages/Homework'))
 const Timetable = lazy(() => import('./pages/Timetable'))
+const SecurityCenter = lazy(() => import('./pages/SecurityCenter'))
+const GlobalSearch = lazy(() => import('./pages/GlobalSearch'))
 
 const STAFF = ['super_admin', 'admin', 'principal']
 const TEACHING_STAFF = [...STAFF, 'teacher']
+const ALL_PORTAL_USERS = [...TEACHING_STAFF, 'student', 'parent']
 
 export default function App() {
   return (
@@ -48,10 +51,13 @@ export default function App() {
         <Route path="/500" element={<ServerError500 />} />
 
         <Route element={<ProtectedRoute />}>
+          <Route element={<RoleProtectedRoute roles={ALL_PORTAL_USERS} />}>
+            <Route path="security" element={<SecurityCenter />} />
+            <Route path="global-search" element={<GlobalSearch />} />
+          </Route>
           <Route element={<RoleProtectedRoute roles={TEACHING_STAFF} />}>
             <Route path="scanner" element={<Scanner />} />
           </Route>
-
           <Route element={<DashboardLayout />}>
             <Route index element={<RoleHome />} />
             <Route path="dashboard/super-admin" element={<Dashboard />} />
@@ -62,7 +68,6 @@ export default function App() {
             <Route element={<RoleProtectedRoute roles={['super_admin']} />}>
               <Route path="super-admin/developer" element={<SuperAdminDeveloperPortal />} />
             </Route>
-
             <Route element={<RoleProtectedRoute roles={STAFF} />}>
               <Route path="students" element={<Students />} />
               <Route path="classes" element={<Classes />} />
@@ -72,12 +77,10 @@ export default function App() {
               <Route path="settings" element={<SettingsPage />} />
               <Route path="support-tickets" element={<SupportTickets />} />
             </Route>
-
             <Route element={<RoleProtectedRoute roles={TEACHING_STAFF} />}>
               <Route path="attendance" element={<Attendance />} />
               <Route path="teacher-attendance" element={<TeacherAttendanceAdmin />} />
             </Route>
-
             <Route path="homework" element={<Homework />} />
             <Route path="timetable" element={<Timetable />} />
             <Route path="fees" element={<Fees />} />
@@ -85,7 +88,6 @@ export default function App() {
             <Route path="leave" element={<Leave />} />
           </Route>
         </Route>
-
         <Route path="*" element={<NotFound404 />} />
       </Routes>
     </Suspense>
