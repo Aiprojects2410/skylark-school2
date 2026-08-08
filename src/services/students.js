@@ -21,8 +21,9 @@ export async function saveStudent(student) {
 
 export async function deleteStudent(id) {
   if (!supabase) return
-  const { error } = await supabase.from('students').delete().eq('id', id)
+  const { data, error } = await supabase.functions.invoke('delete-student', { body: { student_id: id } })
   if (error) throw error
+  if (data?.error) throw new Error(data.error)
 }
 
 export async function setStudentCardPrinted(id, printed) {
