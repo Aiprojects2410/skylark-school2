@@ -9,16 +9,17 @@ import { getTeachers, setTeacherCardPrinted } from '../services/teachers'
 import { regenerateQrToken } from '../services/identity'
 import { useToast } from '../context/ToastContext'
 
-function IdCard({ name, code, role, meta, qrDataUrl, photoUrl }) {
+function IdCard({ name, code, role, meta, qrDataUrl, photoUrl, printMode }) {
+  const isBw = printMode === 'bw'
   return (
-    <div className="id-card">
+    <div className={`id-card ${isBw ? 'id-card-bw' : ''}`}>
       <div className="id-card-header">
         <GraduationCap size={18} />
         <div><p className="text-[11px] font-bold leading-none">SKYLARK SCHOOL</p><p className="text-[9px] opacity-80">{role.toUpperCase()} IDENTITY CARD</p></div>
       </div>
       <div className="flex gap-3 p-3">
         <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-lg bg-slate-100 text-lg font-bold text-slate-400">
-          {photoUrl ? <img src={photoUrl} alt="" className="h-full w-full object-cover" /> : name.split(' ').map(x => x[0]).slice(0, 2).join('')}
+          {photoUrl ? <img src={photoUrl} alt="" crossOrigin="anonymous" className={`h-full w-full object-cover ${isBw ? 'grayscale' : ''}`} /> : name.split(' ').map(x => x[0]).slice(0, 2).join('')}
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-bold text-ink">{name}</p>
@@ -35,6 +36,7 @@ function IdCard({ name, code, role, meta, qrDataUrl, photoUrl }) {
 export default function IdentityCards() {
   const [tab, setTab] = useState('students')
   const [view, setView] = useState('remaining') // 'remaining' = new/unprinted cards queue, 'all' = every card
+  const [printMode, setPrintMode] = useState('color') // 'color' or 'bw'
   const [students, setStudents] = useState([])
   const [teachers, setTeachers] = useState([])
   const [qrMap, setQrMap] = useState({})
@@ -67,8 +69,6 @@ export default function IdentityCards() {
   const remainingItems = useMemo(() => allItems.filter(i => !i.card_printed_at), [allItems])
   const displayedItems = view === 'remaining' ? remainingItems : allItems
 
-  // Default: select every card currently in the remaining queue, so Print/PDF work with
-  // zero extra clicks for the common case (new admissions), but people can still uncheck.
   useEffect(() => {
     if (view === 'remaining') setSelected(new Set(remainingItems.map(i => i.id)))
     else setSelected(new Set())
@@ -136,39 +136,59 @@ export default function IdentityCards() {
   async function handleDownloadPdf() {
     if (view === 'remaining' && selected.size === 0) return notify('Select at least one card to export.')
     setExporting(true)
-    if (view === 'remaining') hideUnselected()
     try {
-      const canvas = await html2canvas(gridRef.current, { scale: 2, backgroundColor: '#ffffff' })
-      const imgData = canvas.toDataURL('image/png')
+      // Capture each card independently instead of the whole scrolling grid. This avoids
+      // mobile/iOS canvas clipping and produces a predictable A4 layout.
+      const nodes = [...gridRef.current.querySelectorAll('[data-card-item]')]
+        .filter(node => view === 'all' || selected.has(node.getAttribute('data-card-item')))
+      if (nodes.length === 0) throw new Error('No cards selected for export.')
+
+      await document.fonts?.ready
       const pdf = new jsPDF('p', 'mm', 'a4')
       const pageWidth = pdf.internal.pageSize.getWidth()
       const pageHeight = pdf.internal.pageSize.getHeight()
-      const imgWidth = pageWidth
-      const imgHeight = (canvas.height * imgWidth) / canvas.width
-      let heightLeft = imgHeight
-      let position = 0
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
-      heightLeft -= pageHeight
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight
-        pdf.addPage()
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
-        heightLeft -= pageHeight
+      const marginX = 10
+      const marginY = 10
+      const gapX = 6
+      const gapY = 8
+      const cardWidth = (pageWidth - marginX * 2 - gapX) / 2
+      const cardMaxHeight = 55
+
+      for (let index = 0; index < nodes.length; index += 1) {
+        if (index > 0 && index % 8 === 0) pdf.addPage()
+        const canvas = await html2canvas(nodes[index].querySelector('.id-card'), {
+          scale: 2,
+          backgroundColor: '#ffffff',
+          useCORS: true,
+          windowWidth: Math.max(800, nodes[index].scrollWidth),
+          windowHeight: Math.max(200, nodes[index].scrollHeight),
+          scrollX: 0,
+          scrollY: -window.scrollY,
+        })
+        const ratio = Math.min(cardWidth / canvas.width, cardMaxHeight / canvas.height)
+        const w = canvas.width * ratio
+        const h = canvas.height * ratio
+        const slot = index % 8
+        const col = slot % 2
+        const row = Math.floor(slot / 2)
+        const x = marginX + col * (cardWidth + gapX) + (cardWidth - w) / 2
+        const y = marginY + row * (cardMaxHeight + gapY)
+        pdf.addImage(canvas.toDataURL('JPEG', 0.94), 'JPEG', x, y, w, h, undefined, 'FAST')
       }
-      pdf.save(`${tab}-id-cards-${new Date().toISOString().slice(0, 10)}.pdf`)
+
+      pdf.save(`${tab}-id-cards-${printMode}-${new Date().toISOString().slice(0, 10)}.pdf`)
       if (view === 'remaining') await markSelectedPrinted()
       notify('PDF downloaded.')
     } catch (e) {
       notify(e.message || 'Could not generate PDF.')
     } finally {
-      if (view === 'remaining') restoreHidden()
       setExporting(false)
     }
   }
 
   return (
     <>
-      <PageHeader eyebrow="IDENTITY" title="Identity & QR Cards" subtitle="Generate printable ID cards with embedded QR codes for scanning."
+      <PageHeader eyebrow="IDENTITY" title="Identity & QR Cards" subtitle="Generate professional printable ID cards with embedded QR codes."
         action={
           <div className="flex flex-wrap gap-2 print:hidden">
             <button onClick={handleDownloadPdf} disabled={exporting} className="btn-secondary disabled:opacity-60"><Download size={16} /> {exporting ? 'Preparing…' : 'Download PDF'}</button>
@@ -177,9 +197,14 @@ export default function IdentityCards() {
         } />
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 print:hidden">
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button onClick={() => setTab('students')} className={`btn-secondary ${tab === 'students' ? 'bg-brand text-white' : ''}`}>Students</button>
           <button onClick={() => setTab('teachers')} className={`btn-secondary ${tab === 'teachers' ? 'bg-brand text-white' : ''}`}>Teachers</button>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-semibold text-slate-400">QR / Card style</span>
+          <button onClick={() => setPrintMode('color')} className={`btn-secondary ${printMode === 'color' ? 'bg-brand text-white' : ''}`}>Color</button>
+          <button onClick={() => setPrintMode('bw')} className={`btn-secondary ${printMode === 'bw' ? 'bg-slate-900 text-white' : ''}`}>Black & White</button>
         </div>
         <div className="flex gap-2">
           <button onClick={() => setView('remaining')} className={`btn-secondary ${view === 'remaining' ? 'bg-brand text-white' : ''}`}>
@@ -215,6 +240,7 @@ export default function IdentityCards() {
                   meta={tab === 'students' ? `${item.class_name || ''} ${item.section_name || ''}`.trim() : item.qualification}
                   qrDataUrl={qrMap[item.qr_token]}
                   photoUrl={item.photo_url}
+                  printMode={printMode}
                 />
                 <div className="mt-2 flex items-center justify-between print:hidden">
                   <div className="flex items-center gap-3">
