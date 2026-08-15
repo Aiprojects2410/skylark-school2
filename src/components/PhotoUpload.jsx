@@ -2,6 +2,36 @@ import { useState } from 'react'
 import { Camera, Loader2 } from 'lucide-react'
 import { uploadPhoto } from '../services/storage'
 
+const MAX_DIMENSION = 400
+const MAX_FILE_SIZE = 1024 * 1024 // 1 MB
+
+async function preparePhoto(file) {
+  if (!file.type?.startsWith('image/')) throw new Error('Please select an image file.')
+
+  // Keep already-small images as-is.
+  if (file.size <= MAX_FILE_SIZE && /jpe?g|webp|png/i.test(file.type)) return file
+
+  const bitmap = await createImageBitmap(file)
+  const scale = Math.min(1, MAX_DIMENSION / Math.max(bitmap.width, bitmap.height))
+  const width = Math.max(1, Math.round(bitmap.width * scale))
+  const height = Math.max(1, Math.round(bitmap.height * scale))
+
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('Could not process the image.')
+  ctx.drawImage(bitmap, 0, 0, width, height)
+  bitmap.close?.()
+
+  const blob = await new Promise((resolve, reject) => {
+    canvas.toBlob(resolve, 'image/jpeg', 0.82)
+  })
+  if (!blob) throw new Error('Could not compress the image.')
+
+  return new File([blob], 'profile-photo.jpg', { type: 'image/jpeg' })
+}
+
 export default function PhotoUpload({ value, onChange, folder = 'misc' }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -12,12 +42,15 @@ export default function PhotoUpload({ value, onChange, folder = 'misc' }) {
     setBusy(true)
     setError('')
     try {
-      const url = await uploadPhoto(file, folder)
+      const prepared = await preparePhoto(file)
+      const url = await uploadPhoto(prepared, folder)
       onChange(url)
     } catch (err) {
-      setError('Upload failed. Please try a smaller image.')
+      console.error('Photo upload failed:', err)
+      setError(err?.message || 'Upload failed. Please try a smaller image.')
     } finally {
       setBusy(false)
+      e.target.value = ''
     }
   }
 
@@ -29,7 +62,7 @@ export default function PhotoUpload({ value, onChange, folder = 'misc' }) {
       <span>
         <span className="btn-secondary text-xs">{value ? 'Change photo' : 'Upload photo'}</span>
         {error && <p className="mt-1 text-xs text-rose-600">{error}</p>}
-        <input type="file" accept="image/*" onChange={handleFile} className="hidden" />
+        <input type="file" accept="image/jpeg,image/png,image/webp,image/*" onChange={handleFile} className="hidden" />
       </span>
     </label>
   )
