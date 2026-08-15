@@ -4,32 +4,48 @@ import { uploadPhoto } from '../services/storage'
 
 const MAX_DIMENSION = 400
 const MAX_FILE_SIZE = 1024 * 1024 // 1 MB
+const ACCEPTED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
 
 async function preparePhoto(file) {
-  if (!file.type?.startsWith('image/')) throw new Error('Please select an image file.')
+  if (!ACCEPTED_TYPES.has(file.type)) throw new Error('Please select a JPG, PNG, or WebP image.')
 
-  // Keep already-small images as-is.
-  if (file.size <= MAX_FILE_SIZE && /jpe?g|webp|png/i.test(file.type)) return file
+  // Keep already-small JPEG/WebP images as-is. PNG is also preserved when it is already within the limit.
+  if (file.size <= MAX_FILE_SIZE) return file
 
   const bitmap = await createImageBitmap(file)
   const scale = Math.min(1, MAX_DIMENSION / Math.max(bitmap.width, bitmap.height))
-  const width = Math.max(1, Math.round(bitmap.width * scale))
-  const height = Math.max(1, Math.round(bitmap.height * scale))
+  let width = Math.max(1, Math.round(bitmap.width * scale))
+  let height = Math.max(1, Math.round(bitmap.height * scale))
 
   const canvas = document.createElement('canvas')
-  canvas.width = width
-  canvas.height = height
   const ctx = canvas.getContext('2d')
-  if (!ctx) throw new Error('Could not process the image.')
-  ctx.drawImage(bitmap, 0, 0, width, height)
+  if (!ctx) {
+    bitmap.close?.()
+    throw new Error('Could not process the image.')
+  }
+
+  // Re-encode as JPEG and lower quality/dimensions only as much as needed to stay below 1 MB.
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    canvas.width = width
+    canvas.height = height
+    ctx.clearRect(0, 0, width, height)
+    ctx.drawImage(bitmap, 0, 0, width, height)
+
+    const quality = Math.max(0.5, 0.82 - attempt * 0.07)
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', quality))
+    if (!blob) break
+
+    if (blob.size <= MAX_FILE_SIZE) {
+      bitmap.close?.()
+      return new File([blob], 'profile-photo.jpg', { type: 'image/jpeg' })
+    }
+
+    width = Math.max(160, Math.round(width * 0.8))
+    height = Math.max(160, Math.round(height * 0.8))
+  }
+
   bitmap.close?.()
-
-  const blob = await new Promise((resolve, reject) => {
-    canvas.toBlob(resolve, 'image/jpeg', 0.82)
-  })
-  if (!blob) throw new Error('Could not compress the image.')
-
-  return new File([blob], 'profile-photo.jpg', { type: 'image/jpeg' })
+  throw new Error('The image could not be compressed below the 1 MB limit.')
 }
 
 export default function PhotoUpload({ value, onChange, folder = 'misc' }) {
@@ -47,7 +63,7 @@ export default function PhotoUpload({ value, onChange, folder = 'misc' }) {
       onChange(url)
     } catch (err) {
       console.error('Photo upload failed:', err)
-      setError(err?.message || 'Upload failed. Please try a smaller image.')
+      setError(err?.message || 'Upload failed. Please try again.')
     } finally {
       setBusy(false)
       e.target.value = ''
@@ -62,7 +78,7 @@ export default function PhotoUpload({ value, onChange, folder = 'misc' }) {
       <span>
         <span className="btn-secondary text-xs">{value ? 'Change photo' : 'Upload photo'}</span>
         {error && <p className="mt-1 text-xs text-rose-600">{error}</p>}
-        <input type="file" accept="image/jpeg,image/png,image/webp,image/*" onChange={handleFile} className="hidden" />
+        <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFile} className="hidden" />
       </span>
     </label>
   )
