@@ -1,0 +1,1 @@
+Identity card print/PDF fix is implemented in src/pages/IdentityCards.jsx and src/styles.css.
