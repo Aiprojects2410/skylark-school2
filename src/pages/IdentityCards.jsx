@@ -14,20 +14,28 @@ function IdCard({ name, code, role, meta, qrDataUrl, photoUrl, printMode }) {
   return (
     <div className={`id-card ${isBw ? 'id-card-bw' : ''}`}>
       <div className="id-card-header">
-        <GraduationCap size={18} />
-        <div className="id-card-header-copy"><p>SKYLARK SCHOOL</p><span>{role.toUpperCase()} IDENTITY CARD</span></div>
+        <GraduationCap size={20} />
+        <div className="id-card-header-copy">
+          <p>SKYLARK SCHOOL</p>
+          <span>{role.toUpperCase()} IDENTITY CARD</span>
+        </div>
       </div>
-      <div className="id-card-body">
+
+      <div className="id-card-top">
         <div className="id-card-photo">
           {photoUrl ? <img src={photoUrl} alt="" crossOrigin="anonymous" className={isBw ? 'grayscale' : ''} /> : name.split(' ').map(x => x[0]).slice(0, 2).join('')}
         </div>
-        <div className="id-card-details">
-          <p className="id-card-name">{name}</p>
-          <p className="id-card-code">{code}</p>
-          {meta && <p className="id-card-meta">{meta}</p>}
+        <div className="id-card-qr">
+          {qrDataUrl ? <img src={qrDataUrl} alt="QR code" /> : <span>QR</span>}
         </div>
-        <div className="id-card-qr">{qrDataUrl && <img src={qrDataUrl} alt="QR code" />}</div>
       </div>
+
+      <div className="id-card-details">
+        <p className="id-card-name">{name}</p>
+        <p className="id-card-code">{role === 'student' ? 'School ID: ' : 'Employee ID: '}{code}</p>
+        {meta && <p className="id-card-meta">{meta}</p>}
+      </div>
+
       <div className="id-card-footer">Valid for academic year 2026–27 · skylarkschool.edu</div>
     </div>
   )
@@ -48,7 +56,10 @@ export default function IdentityCards() {
   const hiddenNodesRef = useRef([])
 
   useEffect(() => {
-    Promise.all([getStudents(), getTeachers()]).then(([s, t]) => { setStudents(s); setTeachers(t) }).catch(e => notify(e.message)).finally(() => setLoading(false))
+    Promise.all([getStudents(), getTeachers()])
+      .then(([s, t]) => { setStudents(s); setTeachers(t) })
+      .catch(e => notify(e.message))
+      .finally(() => setLoading(false))
   }, [])
 
   useEffect(() => {
@@ -56,9 +67,12 @@ export default function IdentityCards() {
     items.forEach(item => {
       const token = item.qr_token
       if (!token || qrMap[token]) return
-      QRCode.toDataURL(token, { margin: 0, width: 128, color: { dark: '#172033', light: '#00000000' } })
-        .then(url => setQrMap(m => ({ ...m, [token]: url })))
-        .catch(() => {})
+      QRCode.toDataURL(token, {
+        margin: 0,
+        width: 256,
+        color: { dark: '#172033', light: '#ffffff' },
+        errorCorrectionLevel: 'H',
+      }).then(url => setQrMap(m => ({ ...m, [token]: url }))).catch(() => {})
     })
   }, [tab, students, teachers])
 
@@ -72,13 +86,17 @@ export default function IdentityCards() {
   }, [view, tab, remainingItems.length])
 
   function toggleSelected(id) {
-    setSelected(s => { const next = new Set(s); next.has(id) ? next.delete(id) : next.add(id); return next })
+    setSelected(s => {
+      const next = new Set(s)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
   }
   function selectAll() { setSelected(new Set(remainingItems.map(i => i.id))) }
   function selectNone() { setSelected(new Set()) }
 
   function hideUnselected() {
-    const nodes = gridRef.current.querySelectorAll('[data-card-item]')
+    const nodes = gridRef.current?.querySelectorAll('[data-card-item]') || []
     hiddenNodesRef.current = []
     nodes.forEach(node => {
       if (!selected.has(node.getAttribute('data-card-item'))) {
@@ -134,22 +152,22 @@ export default function IdentityCards() {
     if (view === 'remaining' && selected.size === 0) return notify('Select at least one card to export.')
     setExporting(true)
     try {
-      const nodes = [...gridRef.current.querySelectorAll('[data-card-item]')]
+      const nodes = [...(gridRef.current?.querySelectorAll('[data-card-item]') || [])]
         .filter(node => view === 'all' || selected.has(node.getAttribute('data-card-item')))
       if (nodes.length === 0) throw new Error('No cards selected for export.')
 
       await document.fonts?.ready
-      const pdf = new jsPDF('l', 'mm', 'a4')
+      const pdf = new jsPDF('p', 'mm', 'a4')
       const pageWidth = pdf.internal.pageSize.getWidth()
       const pageHeight = pdf.internal.pageSize.getHeight()
-      const marginX = 10
-      const marginY = 10
-      const gapX = 8
-      const gapY = 8
       const columns = 2
       const rows = 2
-      const cardWidth = (pageWidth - marginX * 2 - gapX) / columns
-      const cardHeight = Math.min(62, (pageHeight - marginY * 2 - gapY) / rows)
+      const marginX = 12
+      const marginY = 12
+      const gapX = 8
+      const gapY = 10
+      const cardWidth = Math.min(88, (pageWidth - marginX * 2 - gapX) / columns)
+      const cardHeight = Math.min(118, (pageHeight - marginY * 2 - gapY) / rows)
 
       for (let index = 0; index < nodes.length; index += 1) {
         const slot = index % (columns * rows)
@@ -160,12 +178,12 @@ export default function IdentityCards() {
           backgroundColor: '#ffffff',
           useCORS: true,
           allowTaint: false,
-          imageTimeout: 10000,
+          imageTimeout: 15000,
           logging: false,
-          windowWidth: Math.max(1000, card.scrollWidth),
-          windowHeight: Math.max(300, card.scrollHeight),
           scrollX: 0,
           scrollY: 0,
+          windowWidth: 600,
+          windowHeight: 900,
         })
         const ratio = Math.min(cardWidth / canvas.width, cardHeight / canvas.height)
         const w = canvas.width * ratio
@@ -174,7 +192,7 @@ export default function IdentityCards() {
         const row = Math.floor(slot / columns)
         const x = marginX + col * (cardWidth + gapX) + (cardWidth - w) / 2
         const y = marginY + row * (cardHeight + gapY) + (cardHeight - h) / 2
-        pdf.addImage(canvas.toDataURL('JPEG', 0.95), 'JPEG', x, y, w, h, undefined, 'FAST')
+        pdf.addImage(canvas.toDataURL('JPEG', 0.96), 'JPEG', x, y, w, h, undefined, 'FAST')
       }
 
       pdf.save(`${tab}-id-cards-${printMode}-${new Date().toISOString().slice(0, 10)}.pdf`)
